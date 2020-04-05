@@ -1,0 +1,26 @@
+{
+  "name": "app-schema",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "jasmine"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/shawnwhinnery/app-schema.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/shawnwhinnery/app-schema/issues"
+  },
+  "homepage": "https://github.com/shawnwhinnery/app-schema#readme",
+  "dependencies": {
+    "colors": "^1.4.0",
+    "lodash": "^4.17.15"
+  },
+  "devDependencies": {
+    "jasmine": "^3.5.0"
+  }
+}
