@@ -1,5 +1,6 @@
 
 require('colors')
+
 const {
     STRING,
     BOOLEAN,
@@ -30,7 +31,6 @@ const defaultValidators = {
     }
 }
 
-
 module.exports = ({
     name, models
 }) => {
@@ -42,6 +42,8 @@ module.exports = ({
 
     const validators = { ...defaultValidators }
     const factories = {}
+    const serializers = {}
+    const deserializers = {}
 
     // initialize models
     // --------------------------------------------
@@ -54,62 +56,43 @@ module.exports = ({
             model.attributes.forEach(attribute => {
                 var { name, type, defaultValue, collection } = attribute
 
-                if(collection) {
-                    defaultValue = []
-                }
-
                 var factory = factories[type],
                     validator = validators[type],
-                    inputValue = obj[name],
-                    poopinValue = typeof inputValue === 'undefined' ? defaultValue : obj[name],
-                    testValue = factory && !collection ? factory(poopinValue) : poopinValue,
-                    isValid = collection ? (() => {
-                        var valid = Array.isArray(testValue)
-                        if(valid && testValue.length) {
-                            testValue.forEach(_obj => {
-                                if(!validator(_obj)) {
-                                    valid = false
-                                }
-                            })
-                        }
-                        return valid
-                    })() : validator(testValue)
+                    sourceValue = obj[name],
+                    finalValue,
+                    isValid
 
-                console.log('')
-                console.log('FACTORY ------------------'.yellow)
-                console.log('model:         '.grey, model.name.green)
-                console.log('attribute:     '.grey, attribute.name.green)
-                console.log('attribute type:'.grey, type.green)
-                console.log('collection:    '.grey, !!collection ? "true".blue : "false".red)
-                console.log('defaultValue:  '.grey, defaultValue)
-                console.log('inputValue:    '.grey, inputValue)
-                console.log('poopinValue:   '.grey, poopinValue)
-                console.log('testValue:     '.grey, testValue)
-                console.log('isValid:       '.grey, isValid ? "true".blue : "false".red)
-                
-                console.log('validator:     '.blue, validator)
-                console.log('factory:       '.blue, factory)
+                if (collection) {
+
+                    // default collections
+                    if (sourceValue === undefined || sourceValue == null) {
+                        sourceValue = []
+                    }
+
+                    if (Array.isArray(sourceValue)) {
+                        sourceValue = factory ? sourceValue.map(factory) : sourceValue
+                        finalValue = sourceValue
+                        isValid = true
+                    } else {
+                        throw new Error(`Collections must be arrays`)
+                    }
+
+                } else {
+                    finalValue = sourceValue === undefined ? defaultValue : sourceValue
+                    if (factory) {
+                        finalValue = factory(finalValue)
+                    }
+                    isValid = validator(finalValue)
+                }
+
 
                 if (!isValid) {
-                    if(factory) {
-                        output[name] = factory(testValue)
-                    } else {
-                        throw new Error(`missing or invalid attrubute "${testValue}" for attribute "${name}" while constructing model "${model.name}". Expected type "${type}".`)
-                    }
+                    throw new Error(`missing or invalid attrubute "${finalValue}" for attribute "${name}" while constructing model "${model.name}". Expected type "${type}" actual type is "${typeof finalValue}".`)
                 } else {
-                    if(factory && !collection) {
-                        output[name] = factory(testValue)
-                    } else {
-                        output[name] = testValue
-                    }
+                    output[name] = finalValue
                 }
 
             })
-            // console.log('--')
-            // console.log(output[name])
-            // console.log('--')
-
-            // console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~'.yellow)
 
             return output
         }
@@ -122,31 +105,30 @@ module.exports = ({
 
                 var attrValid = false,
                     inputValue = obj[attribute.name],
-                    validator = validators[attribute.type],
-                    defaultValue = attribute.collection ? [] : attribute.defaultValue
-                    
+                    validator = validators[attribute.type]
 
-                    // console.log('')
-                    // console.log('VALIDATE ------------------'.yellow)
-                    // console.log('model:         ', model.name.green)
-                    // console.log('attribute:     ', attribute.name.green)
-                    // console.log('attribute type:', attribute.type.green)
-                    // console.log('collection:    ', !!attribute.collection)
-                    // console.log('defaultValue:  ', defaultValue)
-                    // // console.log('factory:       ', factory)
-                    // console.log('validator:     ', validator)
-                    // console.log('inputValue:    ', inputValue)
-                    // // console.log('isValid:       ', isValid)
-                    // console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~'.yellow)
+
+                // console.log('')
+                // console.log('VALIDATE ------------------'.yellow)
+                // console.log('model:         ', model.name.green)
+                // console.log('attribute:     ', attribute.name.green)
+                // console.log('attribute type:', attribute.type.green)
+                // console.log('collection:    ', !!attribute.collection)
+                // console.log('defaultValue:  ', defaultValue)
+                // // console.log('factory:       ', factory)
+                // console.log('validator:     ', validator)
+                // console.log('inputValue:    ', inputValue)
+                // // console.log('isValid:       ', isValid)
+                // console.log('~~~~~~~~~~~~~~~~~~~~~~~~~~~'.yellow)
 
                 if (attribute.collection) {
-                    
-                    inputValue = Array.isArray(inputValue) ? inputValue : defaultValue
+
+                    inputValue = Array.isArray(inputValue) ? inputValue : []
 
                     var collectionValid = !inputValue.some((_obj, i) => {
-                            console.log(`${model.name} : ${attribute.name} : ${inputValue}`)
-                            return !validator(inputValue)
-                        })
+                        // console.log(`${model.name} : ${attribute.name} : ${inputValue}`)
+                        return !validator(inputValue)
+                    })
 
                     attrValid = collectionValid
 
@@ -166,10 +148,76 @@ module.exports = ({
             return modelisValid
         }
 
+        serializers[model.name] = obj => {
+
+            var arr = [],
+                validator = validators[model.type]
+
+            if (validator) {
+                if (!validator(obj)) {
+                    throw new Error('invalid object')
+                }
+            }
+
+            model.attributes.forEach(attribute => {
+
+                var serializer = serializers[attribute.type],
+                    inputVal = obj[attribute.name]
+
+                if (attribute.collection) {
+                    if (serializer) {
+                        arr.push(inputVal.map(serializer))
+                    } else {
+                        arr.push(inputVal)
+                    }
+                } else {
+                    if (serializer) {
+                        arr.push(serializer(inputVal))
+                    } else {
+                        arr.push(inputVal)
+                    }
+                }
+            })
+
+            return arr
+
+        }
+
+        deserializers[model.name] = arr => {
+
+            var obj = {}
+
+            model.attributes.forEach((attribute, i) => {
+
+                var deserializer = deserializers[attribute.type],
+                    inputVal = arr[i]
+
+                if (attribute.collection) {
+                    if (deserializer) {
+                        obj[attribute.name] = inputVal.map(deserializer)
+                    } else {
+                        obj[attribute.name] = inputVal
+                    }
+                } else {
+                    if (deserializer) {
+                        obj[attribute.name] = deserializer(inputVal)
+                    } else {
+                        obj[attribute.name] = inputVal
+                    }
+                }
+
+            })
+
+            return obj
+
+        }
+
     })
 
     return {
         validators,
-        factories
+        factories,
+        serializers,
+        deserializers
     }
 }

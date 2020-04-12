@@ -50,8 +50,8 @@ const Food = {
             ]
         },
         {
-            "name": "Food",
-            "type": "string"
+            "name": "created",
+            "type": "number"
         }
     ]
 }
